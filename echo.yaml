@@ -1,0 +1,15 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: hello-world-pipeline
+spec:
+  tasks:
+    - name: echo-hello-world
+      taskSpec:
+        steps:
+          - name: echo-hello
+            image: alpine:3.14
+            command: ["echo", "Hello World!"]
+          - name: echo-date
+            image: alpine:3.14
+            command: ["date"]

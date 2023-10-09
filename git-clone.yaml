@@ -1,252 +1,104 @@
-# Copyright 2023 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-apiVersion: tekton.dev/v1beta1
-kind: Task
+apiVersion: tekton.dev/v1alpha1
+kind: Pipeline
 metadata:
-  name: git-clone
-  labels:
-    app.kubernetes.io/version: "0.1.0"
-  annotations:
-    tekton.dev/pipelines.minVersion: "0.41.0"
-    tekton.dev/categories: Git
-    tekton.dev/tags: git
-    tekton.dev/displayName: "git clone"
-    tekton.dev/platforms: "linux/amd64"
+  name: pipeline-git-clone-build-push-deploy
 spec:
-  description: >-
-    The git-clone task supports cloning a public or a private repository using
-    either a Cloud Build Repositories connection or SSH with a private key
-    stored in GCP Secret Manager. By default, the repository will be cloned
-    into the root of your workspace. If needed, you can clone the repository
-    into a subdirectory by setting the `subDirectory` parameter of this Task.
-  workspaces:
-    - name: output
-      description: The workspace where the repository will be cloned.
+  description: |
+    this pipeline offers a typical CI/CD process, with a flow including:
+    - fetching a git repository as the source
+    - using buildah to build a Docker image by Dockerfile
+    - pusing the built Docker image to a desired repository
+    - deploying it to Kubernetes cluster
+  
+  # Parameters
   params:
-    - name: reposResource
-      description: |
-        The URL of the Cloud Build Repository resource, in the format
-        `projects/<project-id>/locations/<location-name>/connections/<connection-name>/repositories/<repository-name>`.
-      type: string
-      default: ""
+  - name: repo-url
+    type: string
+    description: The git repository URL to clone from.
+  - name: tag-name
+    type: string
+    description: The git tag to clone.
+  - name: image-full-path-with-tag
+    type: string
+    description: The image full path to host the built image, with version tag, e.g. image-registry.openshift-image-registry.svc:5000/tekton-pipelines/spring-boot-docker:v1.0.0.
+  - name: deployment-manifest
+    type: string
+    description: The manifest file for deployment.
+
+  # Workspaces
+  workspaces:
+  - name: workspace
+  - name: maven-settings
+  - name: empty-dir
+  
+  # Taksks
+  tasks:
+
+  # 1. Task - fetch-repository
+  - name: fetch-repository
+    taskRef:
+      name: git-clone
+    params:
     - name: url
-      description: |
-        The URL of the repository. To be used if a Cloud Build Repository is
-        not specified.
-      type: string
-      default: ""
-    - name: sshServerPublicKeys
-      description: |
-        The public keys of the SSH server in an array. Each entry should be in
-        the format `<encryption-type> <ssh-public-key>`.
-        For example, the public ssh keys for github.com would look like:
-        [
-          'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl',
-          'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk='
-        ].
-      type: array
-      default: [""]
-    - name: sshPrivateKeySecretsResource
-      description: |
-        The URL of the SSH private key saved on Secret Manager, in
-        the format `projects/<project-id>/secrets/<secret-name>/versions/<version-name>`.
-      type: string
-      default: ""
+      value: $(params.repo-url)
     - name: revision
-      description: Revision (branch, tag, or commit sha) to checkout.
-      type: string
-      default: "main"
-    - name: depth
-      description: |
-        Depth level to perform git clones. If unspecified, a full clone will be
-        performed.
-      type: string
-      default: ""
-    - name: submodules
-      description: Initialize and fetch git submodules.
-      type: string
-      default: "true"
-    - name: subDirectory
-      description: |
-        Subdirectory inside the "output" workspace to clone the repository into.
-      type: string
-      default: ""
+      value: $(params.tag-name)
     - name: deleteExisting
-      description: |
-        By default, this task will clear the cloning destination if it is not
-        empty.
-      type: string
-      default: "true"
-    - name: verbose
-      description: |
-        Output additional details from the operation. Helpful for debugging.
-      type: string
-      default: "false"
-  results:
-    - name: git_ARTIFACT_DIGEST
-      description: The SHA for the commit that was checked out in the workspace.
-    - name: git_ARTIFACT_URI
-      description: The URL of the Git repo that was fetched.
-  steps:
-    - name: clone
-      image: us-docker.pkg.dev/gcb-catalog-release/catalog/git@sha256:5dba1c6220e160e591decddcd30ab9e381abed709b6e6fc59e35ea0ec003e83d
-      env:
-        - name: REPOS_RESOURCE
-          value: $(params.reposResource)
-        - name: URL
-          value: $(params.url)
-        - name: SSH_PRIVATE_KEY_SECRETS_RESOURCE
-          value: $(params.sshPrivateKeySecretsResource)
-        - name: REVISION
-          value: $(params.revision)
-        - name: DEPTH
-          value: $(params.depth)
-        - name: SUBMODULES
-          value: $(params.submodules)
-        - name: WORKSPACE_OUTPUT_PATH
-          value: $(workspaces.output.path)
-        - name: SUBDIRECTORY
-          value: $(params.subDirectory)
-        - name: DELETE_EXISTING
-          value: $(params.deleteExisting)
-        - name: VERBOSE
-          value: $(params.verbose)
-      args: ["$(params.sshServerPublicKeys[*])"]
-      script: |
-        #!/bin/sh
-        set -eu
-        slog() {
-          if [ "${VERBOSE}" = "true" ] ; then
-            echo "$@"
-          fi
-        }
-        export TOKEN=$(curl -s "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token" \
-          --header "Metadata-Flavor: Google" | jq -r '.access_token')
-        slog "Parameters:" "\n" \
-           "\treposResource" $REPOS_RESOURCE $URL "\n" \
-           "\turl:" $URL "\n" \
-           "\tsshPrivateKeySecretsResource:" $SSH_PRIVATE_KEY_SECRETS_RESOURCE "\n" \
-           "\trevision:" $REVISION "\n" \
-           "\tdepth:" $DEPTH "\n" \
-           "\tworkspaces.output.path:" $WORKSPACE_OUTPUT_PATH "\n" \
-           "\tsubmodules:" $SUBMODULES "\n" \
-           "\tsubDirectory:" $SUBDIRECTORY "\n" \
-           "\tdeleteExisting:" $DELETE_EXISTING "\n" \
-           "\tverbose:" $VERBOSE "\n" \
-           "\tsshServerPublicKeys:" "$@"
-        if [ -n "${SSH_PRIVATE_KEY_SECRETS_RESOURCE}" ] ; then
-          # parse host and port from URL
-          if echo "$URL" | grep -q "^ssh"; then # format as ssh://<username>@<hostname>:<port>/<path>
-              HOST=$(echo "$URL" | awk -F[@] '{print $3}' | cut -d':' -f1)
-          elif echo "$URL" | grep -q "^git"; then # format as git://<hostname>/<path>.git
-              HOST=$(echo "$URL" | awk -F[@:] '{print $2}' | cut -d':' -f1)
-          fi
-          # add the ssh public keys
-          mkdir -p ~/.ssh
-          for SSH_SERVER_PUBLIC_KEY in "$@"; do
-            echo "${HOST} ${SSH_SERVER_PUBLIC_KEY}" >> ~/.ssh/known_hosts
-            slog "Added public key: ${HOST} ${SSH_SERVER_PUBLIC_KEY}"
-          done
-          # fetch ssh private key
-          curl --silent \
-              --show-error \
-              --fail \
-              "https://secretmanager.googleapis.com/v1/${SSH_PRIVATE_KEY_SECRETS_RESOURCE}:access" \
-              -H "authorization: Bearer ${TOKEN}" \
-              -H "content-type: application/json" > /tmp/secretmanager_ssh_private_key.json
-          # Check for errors in response
-          error=$(jq '.error.message' < /tmp/secretmanager_ssh_private_key.json)
-          # When '.error.message' is not found, jq returns "null"
-          if [ "$error" != "" ] && [ "$error" != "null" ]; then
-            rm /tmp/secretmanager_ssh_private_key.json
-            echo "Error: $error"
-            exit 1
-          fi
-          # extract Key
-          jq -r '.payload.data' < /tmp/secretmanager_ssh_private_key.json \
-              | base64 -d > id_rsa
-          rm /tmp/secretmanager_ssh_private_key.json
-          mkdir -p ${HOME}/.ssh
-          cp id_rsa ${HOME}/.ssh
-          chmod 700 ${HOME}/.ssh
-          chmod -R 400 ${HOME}/.ssh/*
-          slog "Fetched ssh private key from ${SSH_PRIVATE_KEY_SECRETS_RESOURCE}:access"
-        fi
-        if [ -n "${REPOS_RESOURCE}" ] ; then
-          # get the remote git URL of the repository
-          URL=$(curl --silent \
-                    --show-error \
-                    --fail \
-                    -H "Authorization: Bearer ${TOKEN}" \
-                    -H "Content-Type: application/json" \
-                    "https://cloudbuild.googleapis.com/v2/${REPOS_RESOURCE}" \
-              | jq -r '.remoteUri')
-          # get the read access token for the repository (hidden from log output)
-          REPOS_API_TOKEN=$(curl --silent \
-                                --show-error \
-                                --fail \
-                                -H "Authorization: Bearer ${TOKEN}" \
-                                -H "Content-Type: application/json" \
-                                -d '{}' \
-                                "https://cloudbuild.googleapis.com/v2/${REPOS_RESOURCE}:accessReadToken" \
-              | jq -r '.token')
-          DOMAIN=$(echo "$URL" | awk -F/ '{print $3}')
-        cat << EOF >> .gitconfig
-        [credential "https://${DOMAIN}"]
-          helper = store
-        EOF
-        cat << EOF >> .git-credentials
-        https://x-access-token:${REPOS_API_TOKEN}@${DOMAIN}
-        EOF
-          slog "From Repos Resource: Domain=$DOMAIN  URL=$URL"
-        elif [ -z "${URL}"] ; then
-          echo "One of reposResource or url must be set."
-          exit 1
-        fi
-        CHECKOUT_DIR=""
-        cleandir() {
-          # Delete any existing contents of the repository directory if it exists.
-          if [ -d "${CHECKOUT_DIR}" ] ; then
-            # Delete non-hidden files and directories
-            rm -rf "${CHECKOUT_DIR:?}"/*
-            # Delete files and directories starting with . but excluding ..
-            rm -rf "${CHECKOUT_DIR}"/.[!.]*
-            # Delete files and directories starting with .. plus any other character
-            rm -rf "${CHECKOUT_DIR}"/..?*
-          fi
-        }
-        if [ -n "${WORKSPACE_OUTPUT_PATH}" ] && [ "${DELETE_EXISTING}" = "true" ] ; then
-          CHECKOUT_DIR="${WORKSPACE_OUTPUT_PATH}/${SUBDIRECTORY}"
-          cleandir
-          slog echo "Cleaned checkout dir: $CHECKOUT_DIR"
-        fi
-        git init "${CHECKOUT_DIR}"
-        cd "${CHECKOUT_DIR}"
-        git remote add origin ${URL}
-        if [ -n "${DEPTH}" ]; then
-          git fetch --depth "${DEPTH}" --all
-          slog "Fetch depth $DEPTH from ${URL}"
-        else
-          git fetch --all
-          slog "Fetch all from ${URL}"
-        fi
-        slog echo "Checking out revision  $REVISION"
-        git checkout -f "${REVISION}"
-        if [ "${SUBMODULES}" = "true" ]; then
-          git submodule update --init --recursive
-        fi
-        COMMIT_SHA="$(git rev-parse HEAD)"
-        printf "%s" "${COMMIT_SHA}" > "$(results.git_ARTIFACT_DIGEST.path)"
-        printf "%s" "${URL}" > "$(results.git_ARTIFACT_URI.path)"
+      value: "true"
+    workspaces:
+    - name: output
+      workspace: workspace
+
+  # 2. Task - maven build
+  - name: maven
+    taskRef:
+      name: maven
+    runAfter:
+    - fetch-repository
+    params:
+    - name: GOALS
+      value:
+        - -B
+        - -DskipTests
+        - clean
+        - package
+    workspaces:
+    - name: maven-settings
+      workspace: maven-settings
+    - name: source
+      workspace: workspace
+
+  # 3. Task - buildah build & push
+  - name: buildah
+    taskRef:
+      name: buildah
+    runAfter:
+    - maven
+    params:
+      - name: IMAGE
+        value: "$(params.image-full-path-with-tag)"
+      - name: TLSVERIFY
+        value: "false"
+      - name: STORAGE_DRIVER
+        value: "vfs"
+    workspaces:
+      - name: source
+        workspace: workspace
+
+  # 4. Task - kubectl deploy
+  - name: deploy
+    taskRef:
+      name: kubernetes-actions
+    runAfter:
+    - buildah
+    params:
+      - name: script
+        value: |
+          kubectl apply -f $(params.deployment-manifest)
+          echo "----------"
+          kubectl get deployment
+    workspaces:
+      - name: kubeconfig-dir
+        workspace: empty-dir
+      - name: manifest-dir
+        workspace: empty-dir

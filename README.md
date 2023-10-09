@@ -1,3 +1,7 @@
+# Click Count Crew Demo
+
+Hello world!
+
 # Fresh project
 
 Your new Fresh project is ready to go. You can follow the Fresh "Getting

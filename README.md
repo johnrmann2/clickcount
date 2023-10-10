@@ -1,6 +1,6 @@
 # Click Count Crew Demo
 
-Hello, world!
+Hello, world! Dummy commit
 
 # Fresh project
 

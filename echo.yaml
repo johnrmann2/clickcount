@@ -8,7 +8,7 @@ spec:
       type: string
       default: "World"
   tasks:
-    - name: echo-hello-world
+    - name: echo-hello
       taskSpec:
         steps:
           - name: echo-hello
@@ -17,6 +17,9 @@ spec:
             args:
               - |
                 echo "Hello ${params.name}!"
+    - name: echo-date
+      taskSpec:
+        steps:
           - name: echo-date
             image: alpine:3.14
             command: ["date"]

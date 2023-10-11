@@ -14,7 +14,7 @@ spec:
             image: alpine:3.14
             command: ["date"]
           - name: echo-build
-            image: docker:19.03.13
+            image: alpine:3.14
             command: ["docker"]
             args:
               - "build"

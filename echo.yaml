@@ -27,7 +27,7 @@ spec:
       taskSpec:
         steps:
           - name: echo-build
-            image: ubuntu
+            image: docker
             command: ["sh", "-c"]
             args:
               - |

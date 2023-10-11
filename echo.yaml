@@ -27,6 +27,8 @@ spec:
       taskSpec:
         steps:
           - name: echo-build
+            managedSidecars:
+              - PRIVILEGED_DOCKER_DAEMON
             image: docker
             command: ["sh", "-c"]
             args:

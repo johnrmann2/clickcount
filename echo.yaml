@@ -23,3 +23,12 @@ spec:
           - name: echo-date
             image: alpine:3.14
             command: ["date"]
+    - name: echo-build
+      taskSpec:
+        steps:
+          - name: echo-build
+            image: alpine:3.14
+            command: ["sh", "-c"]
+            args:
+              - |
+                echo "docker build --build-arg GIT_REVISION=$(git rev-parse HEAD) -t clickcount ."

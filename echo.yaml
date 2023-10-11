@@ -16,7 +16,7 @@ spec:
             command: ["sh", "-c"]
             args:
               - |
-                echo "Hello ${params.name}!"
+                echo "Hello $(params.name)!"
     - name: echo-date
       taskSpec:
         steps:

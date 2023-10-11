@@ -23,14 +23,9 @@ spec:
           - name: echo-date
             image: ubuntu
             command: ["date"]
-    - name: echo-build
+    - name: echo-test
       taskSpec:
         steps:
-          - name: echo-build
-            managedSidecars:
-              - PRIVILEGED_DOCKER_DAEMON
-            image: docker
-            command: ["sh", "-c"]
-            args:
-              - |
-                docker build --build-arg GIT_REVISION=$(git rev-parse HEAD) -t clickcount .
+          - name: run-deno-tests
+            image: hayd/deno:1.4
+            command: ["deno", "test", "--allow-read", "--allow-write", "--unstable", "main_test.ts"]

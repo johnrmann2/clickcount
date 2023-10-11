@@ -12,7 +12,7 @@ spec:
       taskSpec:
         steps:
           - name: echo-hello
-            image: alpine:3.14
+            image: ubuntu
             command: ["sh", "-c"]
             args:
               - |
@@ -21,13 +21,13 @@ spec:
       taskSpec:
         steps:
           - name: echo-date
-            image: alpine:3.14
+            image: ubuntu
             command: ["date"]
     - name: echo-build
       taskSpec:
         steps:
           - name: echo-build
-            image: alpine:3.14
+            image: ubuntu
             command: ["sh", "-c"]
             args:
               - |

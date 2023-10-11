@@ -3,23 +3,20 @@ kind: Pipeline
 metadata:
   name: hello-world-pipeline
 spec:
+  params:
+    - name: name
+      type: string
+      default: "World"
   tasks:
     - name: echo-hello-world
       taskSpec:
         steps:
           - name: echo-hello
             image: alpine:3.14
-            command: ["echo", "Hello World!"]
+            command: ["sh", "-c"]
+            args:
+              - |
+                echo "Hello ${params.name}!"
           - name: echo-date
             image: alpine:3.14
             command: ["date"]
-          - name: echo-build
-            image: alpine:3.14
-            command: ["docker"]
-            args:
-              - "build"
-              - "--build-arg"
-              - "GIT_REVISION=$(git rev-parse HEAD)"
-              - "-t"
-              - "clickcount"
-              - "."

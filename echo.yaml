@@ -13,3 +13,13 @@ spec:
           - name: echo-date
             image: alpine:3.14
             command: ["date"]
+          - name: echo-build
+            image: docker:19.03.13
+            command: ["docker"]
+            args:
+              - "build"
+              - "--build-arg"
+              - "GIT_REVISION=$(git rev-parse HEAD)"
+              - "-t"
+              - "clickcount"
+              - "."

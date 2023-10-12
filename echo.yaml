@@ -23,9 +23,24 @@ spec:
           - name: echo-date
             image: ubuntu
             command: ["date"]
-    - name: echo-test
+    - name: docker-build
       taskSpec:
+        params:
+          - name: GIT_REVISION
+            type: string
+          - name: IMAGE_NAME
+            type: string
+            default: "clickcount"
         steps:
-          - name: run-deno-tests
-            image: hayd/deno:1.4
-            command: ["deno", "test", "--allow-read", "--allow-write", "--unstable", "main_test.ts"]
+          - name: docker-build
+            image: docker
+            workingDir: /workspace
+            command:
+              - sh
+            args:
+              - -c
+              - |
+                docker build --build-arg GIT_REVISION=$(params.GIT_REVISION) -t $(params.IMAGE_NAME) .
+      params:
+        - name: GIT_REVISION
+          value: "$(git rev-parse HEAD)"

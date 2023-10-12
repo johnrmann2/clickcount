@@ -23,23 +23,3 @@ spec:
           - name: echo-date
             image: ubuntu
             command: ["date"]
-    - name: docker-build
-      taskSpec:
-        params:
-          - name: GIT_REVISION
-            type: string
-          - name: IMAGE_NAME
-            type: string
-            default: "clickcount"
-        steps:
-          - name: docker-build
-            image: docker
-            command:
-              - sh
-            args:
-              - -c
-              - |
-                docker build --build-arg GIT_REVISION=$(params.GIT_REVISION) -t $(params.IMAGE_NAME) .
-      params:
-        - name: GIT_REVISION
-          value: "$(git rev-parse HEAD)"

@@ -34,7 +34,6 @@ spec:
         steps:
           - name: docker-build
             image: docker
-            workingDir: /workspace
             command:
               - sh
             args:
